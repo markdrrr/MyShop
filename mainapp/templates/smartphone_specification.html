@@ -1,0 +1,37 @@
+<table class="table">
+  <tbody>
+    <tr>
+      <td>Диагональ</td>
+      <td>{{ product.diagonal }}</td>
+    </tr>
+      <tr>
+      <td>Оперативная память</td>
+      <td>{{ product.ram }}</td>
+    </tr>
+    <tr>
+      <td>Объем накопителя</td>
+      <td>{{ product.hdd }}</td>
+    </tr>
+      <tr>
+      <td>Наличие слота для SD карты</td>
+      <td>{% if product.sd %}
+            Да
+          {% else %}
+            Нет
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td>Батарея</td>
+      <td>{{ product.accum_volume }}</td>
+    </tr>
+    <tr>
+      <td>Камера (МП)</td>
+      <td>{{ product.main_cam_mp }}</td>
+    </tr>
+    <tr>
+      <td>Фронтальная камера (МП)</td>
+      <td>{{ product.frontal_cam_mp }}</td>
+    </tr>
+  </tbody>
+</table>
