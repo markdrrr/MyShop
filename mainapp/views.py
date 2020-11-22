@@ -1,6 +1,7 @@
+from django.contrib.auth import authenticate, login
 from django.shortcuts import render, get_object_or_404
 from django.views.generic import DetailView, View
-from .forms import OrderForm
+from .forms import *
 from .mixins import *
 from .models import *
 from django.db import models, transaction
@@ -13,55 +14,23 @@ from .utils import recalc_cart
 class BaseView(CartMixin, View):
 
     def get(self, request, *args, **kwargs):
-        categories = get_categories_for_left_sidebar()
-        products = []
+        products = Product.objects.all()
         ct_models = ContentType.objects.filter(model__in=('notebook', 'smartphone'))
         for ct_model in ct_models:
             model_products = ct_model.model_class()._base_manager.all().order_by('-id')[:5]
             products.extend(model_products)
         context = {
-            'categories': categories,
+            'categories': self.categories,
             'products': products,
             'cart': self.cart
         }
         return render(request, 'base.html', context)
 
-# class BaseView(View):
-#
-#     def get(self, request, *args, **kwargs):
-#         # customer = Customer.objects.get(user=request.user)
-#         # cart = Cart.objects.get(owner=customer)
-#         categories = get_categories_for_left_sidebar()
-#         products = []
-#         ct_models = ContentType.objects.filter(model__in=('notebook', 'smartphone'))
-#         for ct_model in ct_models:
-#             model_products = ct_model.model_class()._base_manager.all().order_by('-id')[:5]
-#             products.extend(model_products)
-#         # отфильтровываем в нужном порядке
-#         # products = sorted(
-#         #                 products, key=lambda x: x.__class__._meta.model_name.startswith('notebook'), reverse=True
-#         #             )
-#         context = {
-#             'categories': categories,
-#             'products': products,
-#             # 'cart': cart
-#         }
-#         return render(request, 'base.html', context)
-# def test_view(request):
-#     categories = get_categories_for_left_sidebar()
-#     return render(request, 'base.html', {'categories': categories})
 
-
-def product_detail_view(request, ct_model, slug):
-
-    CT_MODEL_CLASS = {
-        'notebook': Notebook,
-        'smartphone': Smartphone
-    }
-    model = CT_MODEL_CLASS[f'{ct_model}']
-    product = get_object_or_404(model, slug=slug)
-    categories = get_categories_for_left_sidebar()
-    context = {'product': product, 'categories': categories, 'ct_model': ct_model}
+def product_detail_view(request, slug):
+    products = Product.objects.get(slug=slug)
+    categories = Category.objects.all()
+    context = {'product': products, 'categories': categories}
     # достаем карзину
     if request.user.is_authenticated:
         customer = Customer.objects.filter(user=request.user).first()
@@ -80,8 +49,7 @@ def product_detail_view(request, ct_model, slug):
     return render(request, 'product_detail.html', context)
 
 
-class CategoryDetailView(CartMixin, CategoryDetailMixin, DetailView):
-
+class CategoryDetailView(CartMixin, DetailView):
     model = Category
     queryset = Category.objects.all()
     context_object_name = 'category'
@@ -99,11 +67,10 @@ class CategoryDetailView(CartMixin, CategoryDetailMixin, DetailView):
 class AddToCartView(CartMixin, View):
 
     def get(self, request, *args, **kwargs):
-        ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-        content_type = ContentType.objects.get(model=ct_model)
-        product = content_type.model_class().objects.get(slug=product_slug)
+        product_slug = kwargs.get('slug')
+        product = Product.objects.get(slug=product_slug)
         cart_product, created = CartProduct.objects.get_or_create(
-            user=self.cart.owner, cart=self.cart, content_type=content_type, object_id=product.id
+            user=self.cart.owner, cart=self.cart, product=product
         )
         self.cart.products.add(cart_product)
         recalc_cart(self.cart)
@@ -114,30 +81,25 @@ class AddToCartView(CartMixin, View):
 class DeleteFromCartView(CartMixin, View):
 
     def get(self, request, *args, **kwargs):
-        ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-        content_type = ContentType.objects.get(model=ct_model)
-        product = content_type.model_class().objects.get(slug=product_slug)
+        product_slug = kwargs.get('slug')
+        product = Product.objects.get(slug=product_slug)
         cart_product = CartProduct.objects.get(
-            user=self.cart.owner, cart=self.cart, content_type=content_type, object_id=product.id
+            user=self.cart.owner, cart=self.cart, product=product
         )
         self.cart.products.remove(cart_product)
         cart_product.delete()
         recalc_cart(self.cart)
         messages.add_message(request, messages.INFO, "Товар успешно удален")
-        # cart_product.delete()
-        # recalc_cart(self.cart)
-        # messages.add_message(request, messages.INFO, "Товар успешно удален")
         return HttpResponseRedirect('/cart/')
 
 
 class ChangeCountView(CartMixin, View):
 
     def post(self, request, *args, **kwargs):
-        ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-        content_type = ContentType.objects.get(model=ct_model)
-        product = content_type.model_class().objects.get(slug=product_slug)
+        product_slug = kwargs.get('slug')
+        product = Product.objects.get(slug=product_slug)
         cart_product = CartProduct.objects.get(
-            user=self.cart.owner, cart=self.cart, content_type=content_type, object_id=product.id
+            user=self.cart.owner, cart=self.cart, product=product
         )
         count = int(request.POST.get('count'))
         cart_product.count = count
@@ -150,10 +112,9 @@ class ChangeCountView(CartMixin, View):
 class CartView(CartMixin, View):
 
     def get(self, request, *args, **kwargs):
-        categories = get_categories_for_left_sidebar()
         context = {
             'cart': self.cart,
-            'categories': categories
+            'categories': self.categories
         }
         return render(request, 'cart.html', context)
 
@@ -161,11 +122,10 @@ class CartView(CartMixin, View):
 class CheckoutView(CartMixin, View):
 
     def get(self, request, *args, **kwargs):
-        categories = get_categories_for_left_sidebar()
         form = OrderForm(request.POST or None)
         context = {
             'cart': self.cart,
-            'categories': categories,
+            'categories': self.categories,
             'form': form
         }
         return render(request, 'checkout.html', context)
@@ -180,7 +140,7 @@ class MakeOrderView(CartMixin, View):
             customer = Customer.objects.get(user=request.user)
         if form.is_valid():
             new_order = form.save(commit=False)
-            new_order.customer = None
+            new_order.customer = customer
             new_order.first_name = form.cleaned_data['first_name']
             new_order.last_name = form.cleaned_data['last_name']
             new_order.phone = form.cleaned_data['phone']
@@ -198,3 +158,80 @@ class MakeOrderView(CartMixin, View):
             messages.add_message(request, messages.INFO, 'Спасибо за заказ! Менеджер с Вами свяжется')
             return HttpResponseRedirect('/')
         return HttpResponseRedirect('/checkout/')
+
+
+class LoginView(CartMixin, View):
+
+    def get(self, request, *args, **kwargs):
+        form = LoginForm(request.POST or None)
+        context = {
+            'cart': self.cart,
+            'categories': self.categories,
+            'form': form
+        }
+        return render(request, 'login.html', context)
+
+    def post(self, request, *args, **kwargs):
+        form = LoginForm(request.POST or None)
+        if form.is_valid():
+            username = form.cleaned_data['username']
+            password = form.cleaned_data['password']
+            user = authenticate(username=username, password=password)
+            if user:
+                login(request, user)
+                return HttpResponseRedirect('/')
+        context = {
+            'cart': self.cart,
+            'categories': self.categories,
+            'form': form
+        }
+        return render(request, 'login.html', context)
+
+
+class RegistrationView(CartMixin, View):
+
+    def get(self, request, *args, **kwargs):
+        form = RegistrationForm(request.POST or None)
+        context = {
+            'cart': self.cart,
+            'categories': self.categories,
+            'form': form
+        }
+        return render(request, 'registration.html', context)
+
+    def post(self, request, *args, **kwargs):
+        form = RegistrationForm(request.POST or None)
+        if form.is_valid():
+            new_user = form.save(commit=False)
+            new_user.username = form.cleaned_data['username']
+            new_user.email = form.cleaned_data['email']
+            new_user.first_name = form.cleaned_data['first_name']
+            new_user.last_name = form.cleaned_data['last_name']
+            new_user.save()
+            new_user.set_password(form.cleaned_data['password'])
+            new_user.save()
+            print(new_user)
+            Customer.objects.create(user=new_user, phone=form.cleaned_data['phone'],
+                                    address=form.cleaned_data['address'])
+            user = authenticate(username=form.cleaned_data['username'], password=form.cleaned_data['password'])
+            login(request, user)
+            return HttpResponseRedirect('/')
+        context = {
+            'cart': self.cart,
+            'categories': self.categories,
+            'form': form
+        }
+        return render(request, 'registration.html', context)
+
+
+class ProfileView(CartMixin, View):
+
+    def get(self, request, *args, **kwargs):
+        customer = Customer.objects.get(user=request.user)
+        orders = Order.objects.filter(customer=customer).order_by('-created_at')
+        context = {
+            'cart': self.cart,
+            'categories': self.categories,
+            'orders': orders
+        }
+        return render(request, 'profile.html', context)

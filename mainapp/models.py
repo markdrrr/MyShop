@@ -1,26 +1,9 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 
 User = get_user_model()
-
-
-def get_categories_for_left_sidebar():
-    CATEGORY_NAME_COUNT_NAME = {
-        'Ноутбуки': 'notebook__count',
-        'Смартфоны': 'smartphone__count'
-    }
-    mdl = [models.Count(el) for el in ['notebook', 'smartphone']]
-    qs = Category.objects.annotate(*mdl).values()
-    data = [
-        dict(name=c['name'], url=get_object_or_404(Category, name=c['name']).get_absolute_url(),
-             count=c[CATEGORY_NAME_COUNT_NAME[c['name']]]) for c in qs
-    ]
-    return data
 
 
 class Category(models.Model):
@@ -37,9 +20,6 @@ class Category(models.Model):
 
 class Product(models.Model):
 
-    class Meta:
-        abstract = True
-
     category = models.ForeignKey(Category, verbose_name='Категории', on_delete=models.CASCADE)
     title = models.CharField(max_length=255, verbose_name='Наименование')
     slug = models.SlugField(unique=True)
@@ -51,8 +31,7 @@ class Product(models.Model):
         return self.title
 
     def get_absolute_url(self):
-        ct_model = self.__class__._meta.model_name
-        return reverse('product_detail', kwargs={'ct_model': ct_model, 'slug': self.slug})
+        return reverse('product_detail', kwargs={'slug': self.slug})
 
     def get_model_name(self):
         return self.__class__._meta.model_name
@@ -62,22 +41,20 @@ class CartProduct(models.Model):
 
     user = models.ForeignKey('Customer', verbose_name='Покупатель', null=True, blank=True, on_delete=models.CASCADE)
     cart = models.ForeignKey('Cart', verbose_name='Корзина', null=True, blank=True, on_delete=models.CASCADE, related_name='related_products')
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey('content_type', 'object_id')
+    product = models.ForeignKey(Product, verbose_name='Товар', on_delete=models.CASCADE)
     count = models.PositiveIntegerField(default=1)
     final_price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Общая цена')
 
     def __str__(self):
-        return f'Продукт: {self.content_object.title} (для карзины)'
+        return f'Продукт: {self.product.title} (для карзины)'
 
     def save(self, *args, **kwargs):
-        self.final_price = self.count * self.content_object.price
+        self.final_price = self.count * self.product.price
         super().save(*args, **kwargs)
 
 
-
 class Cart(models.Model):
+
     owner = models.ForeignKey('Customer', null=True, blank=True, verbose_name='Владелец', on_delete=models.CASCADE)
     products = models.ManyToManyField(CartProduct, null=True, blank=True, related_name='related_cart')
     total_products = models.PositiveIntegerField(default=0)
@@ -97,31 +74,6 @@ class Customer(models.Model):
 
     def __str__(self):
         return f'Покупатель {self.user.first_name, self.user.last_name}'
-
-
-class Notebook(Product):
-    diagonal = models.CharField(max_length=255, verbose_name='Диоганаль')
-    processor_frag = models.CharField(max_length=255, verbose_name='Процессор')
-    ram = models.CharField(max_length=255, verbose_name='Оперативная память')
-    hdd = models.CharField(max_length=255, verbose_name='Объем накопителя')
-    video = models.CharField(max_length=255, verbose_name='Видеокарта')
-
-    def __str__(self):
-        return f'{self.category.name} : {self.title}'
-
-
-
-class Smartphone(Product):
-    diagonal = models.CharField(max_length=255, verbose_name='Диоганаль')
-    ram = models.CharField(max_length=255, verbose_name='Оперативная память')
-    hdd = models.CharField(max_length=255, verbose_name='Объем накопителя')
-    sd = models.BooleanField(default=True, verbose_name='Наличие SD карты')
-    accum_volume = models.CharField(max_length=255, verbose_name='Батарея')
-    main_cam_mp = models.CharField(max_length=255, verbose_name='Главная камера')
-    frontal_cam_mp = models.CharField(max_length=255, verbose_name='Фронтальная камера')
-
-    def __str__(self):
-        return f'{self.category.name} : {self.title}'
 
 
 class Order(models.Model):
