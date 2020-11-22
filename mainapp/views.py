@@ -27,46 +27,57 @@ class BaseView(CartMixin, View):
         return render(request, 'base.html', context)
 
 
-def product_detail_view(request, slug):
-    products = Product.objects.get(slug=slug)
-    categories = Category.objects.all()
-    context = {'product': products, 'categories': categories}
-    # достаем карзину
-    if request.user.is_authenticated:
-        customer = Customer.objects.filter(user=request.user).first()
-        if not customer:
-            customer = Customer.objects.create(
-                user=request.user
-            )
-        cart = Cart.objects.filter(owner=customer, in_order=False).first()
-        if not cart:
-            cart = Cart.objects.create(owner=customer)
-    else:
-        cart = Cart.objects.filter(for_anonymous_user=True).first()
-        if not cart:
-            cart = Cart.objects.create(for_anonymous_user=True)
-    context["cart"] = cart
-    return render(request, 'product_detail.html', context)
+class ProductDetailView(CartMixin, View):
+
+    def get(self, request, *args, **kwargs):
+        product = Product.objects.get(slug=kwargs['slug'])
+        context = {
+            'categories': self.categories,
+            'product': product,
+            'cart': self.cart
+        }
+        return render(request, 'product_detail.html', context)
+# def product_detail_view(request, slug):
+#     products = Product.objects.get(slug=slug)
+#     categories = Category.objects.all()
+#     context = {'product': products, 'categories': categories}
+#     # достаем карзину
+#     if request.user.is_authenticated:
+#         customer = Customer.objects.filter(user=request.user).first()
+#         if not customer:
+#             customer = Customer.objects.create(
+#                 user=request.user
+#             )
+#         cart = Cart.objects.filter(owner=customer, in_order=False).first()
+#         if not cart:
+#             cart = Cart.objects.create(owner=customer)
+#     else:
+#         cart = Cart.objects.filter(for_anonymous_user=True).first()
+#         if not cart:
+#             cart = Cart.objects.create(for_anonymous_user=True)
+#     context["cart"] = cart
+#     return render(request, 'product_detail.html', context)
 
 
 class CategoryDetailView(CartMixin, DetailView):
-    model = Category
-    queryset = Category.objects.all()
-    context_object_name = 'category'
-    template_name = 'category_detail.html'
-    slug_url_kwarg = 'slug'
 
-    def get_context_data(self, **kwargs):
-        model = self.CATEGORY_SLUG2PRODUCT_MODEL[self.get_object().slug]
-        context = super().get_context_data(**kwargs)
-        context['cart'] = self.cart
-        context['category_products'] = model.objects.all()
-        return context
+    def get(self, request, *args, **kwargs):
+        category = Category.objects.get(slug=kwargs['slug'])
+        products = Product.objects.filter(category=category)
+        context = {
+            'cart': self.cart,
+            'categories': self.categories,
+            'products': products,
+            'category': category
+        }
+        return render(request, 'category_detail.html', context)
 
 
 class AddToCartView(CartMixin, View):
 
     def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect('/login/')
         product_slug = kwargs.get('slug')
         product = Product.objects.get(slug=product_slug)
         cart_product, created = CartProduct.objects.get_or_create(
@@ -112,6 +123,8 @@ class ChangeCountView(CartMixin, View):
 class CartView(CartMixin, View):
 
     def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect('/login/')
         context = {
             'cart': self.cart,
             'categories': self.categories

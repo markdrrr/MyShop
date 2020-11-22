@@ -66,7 +66,7 @@
                                       <tr>
                                           <td colspan="2"></td>
                                           <td>Итого: </td>
-                                          <td>{{ order.cart.total_products }}</td>
+                                          <td>{{ order.cart.total_all_products }}</td>
                                           <td><strong>{{ order.cart.final_price }}</strong> руб.</td>
                                       </tr>
                                       </tbody>
@@ -75,7 +75,7 @@
                                   <h4 class="text-center">Дополнительная информация</h4>
                                   <p>Имя: <strong>{{ order.first_name }}</strong></p>
                                   <p>Фамилия: <strong>{{ order.last_name }}</strong></p>
-                                  <p>Телефон: <strong>{{ order.customer.phone }}</strong></p>
+                                  <p>Телефон: <strong>{{ order.phone }}</strong></p>
                               </div>
                               <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Закрыть</button>
