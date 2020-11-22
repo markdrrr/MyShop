@@ -9,6 +9,10 @@
             {% csrf_token %}
             {{ form|crispy }}
             <input type="submit" class="btn btn-success" value="Войти">
+            &ensp; ИЛИ &ensp;
+            <span class="btn btn-info">
+                <a style="text-decoration: none; color:white;" href="{% url 'registration' %}">Зарегистрироваться</a>
+        </span>
         </form>
     </div>
 </div>

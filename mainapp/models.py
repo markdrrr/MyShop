@@ -8,6 +8,10 @@ User = get_user_model()
 
 class Category(models.Model):
 
+    class Meta:
+        verbose_name = 'Категории'
+        verbose_name_plural = 'Категории'
+
     name = models.CharField(max_length=255, verbose_name='Имя категории')
     slug = models.SlugField(unique=True)
 
@@ -17,8 +21,16 @@ class Category(models.Model):
     def get_absolute_url(self):
         return reverse('category_detail', kwargs={'slug': self.slug})
 
+    def count(self):
+        total = Product.objects.filter(category=self)
+        return len(total)
+
 
 class Product(models.Model):
+
+    class Meta:
+        verbose_name = 'Продукты'
+        verbose_name_plural = 'Продукты'
 
     category = models.ForeignKey(Category, verbose_name='Категории', on_delete=models.CASCADE)
     title = models.CharField(max_length=255, verbose_name='Наименование')
@@ -65,8 +77,20 @@ class Cart(models.Model):
     def __str__(self):
         return str(self.id)
 
+    def total_all_products(self):
+        total = 0
+        for product in self.products.all():
+            total += int(product.count)
+        self.total_products = total
+        return total
+
 
 class Customer(models.Model):
+
+    class Meta:
+        verbose_name = 'Пользователи'
+        verbose_name_plural = 'Пользователи'
+
     user = models.ForeignKey(User, verbose_name='Пользователь', on_delete=models.CASCADE)
     phone = models.CharField(max_length=20, verbose_name='Номер телефона', null=True, blank=True)
     address = models.CharField(max_length=255, verbose_name='Адрес', null=True, blank=True)
