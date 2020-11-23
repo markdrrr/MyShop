@@ -154,13 +154,11 @@ class MakeOrderView(CartMixin, View):
         if form.is_valid():
             new_order = form.save(commit=False)
             new_order.customer = customer
-            new_order.first_name = form.cleaned_data['first_name']
-            new_order.last_name = form.cleaned_data['last_name']
-            new_order.phone = form.cleaned_data['phone']
-            new_order.address = form.cleaned_data['address']
-            new_order.buying_type = form.cleaned_data['buying_type']
-            new_order.order_date = form.cleaned_data['order_date']
-            new_order.comment = form.cleaned_data['comment']
+            # print([f.name for f in new_order._meta.get_fields()])
+            # print(new_order._meta.get_field('first_name'))
+            for el in ['first_name', 'last_name', 'phone', 'address', 'buying_type', 'order_date', 'comment']:
+                value = new_order._meta.get_field(el)
+                value.field = form.cleaned_data[el]
             new_order.save()
             self.cart.in_order = True
             recalc_cart(self.cart)
@@ -216,14 +214,11 @@ class RegistrationView(CartMixin, View):
         form = RegistrationForm(request.POST or None)
         if form.is_valid():
             new_user = form.save(commit=False)
-            new_user.username = form.cleaned_data['username']
-            new_user.email = form.cleaned_data['email']
-            new_user.first_name = form.cleaned_data['first_name']
-            new_user.last_name = form.cleaned_data['last_name']
-            new_user.save()
+            for el in ['username', 'email', 'first_name', 'last_name']:
+                value = new_user._meta.get_field(el)
+                value.field = form.cleaned_data[el]
             new_user.set_password(form.cleaned_data['password'])
             new_user.save()
-            print(new_user)
             Customer.objects.create(user=new_user, phone=form.cleaned_data['phone'],
                                     address=form.cleaned_data['address'])
             user = authenticate(username=form.cleaned_data['username'], password=form.cleaned_data['password'])
